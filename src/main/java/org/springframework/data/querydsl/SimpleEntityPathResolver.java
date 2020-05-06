@@ -15,10 +15,13 @@
  */
 package org.springframework.data.querydsl;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.util.Optional;
 
+import com.querydsl.core.types.Path;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
@@ -43,7 +46,7 @@ public class SimpleEntityPathResolver implements EntityPathResolver {
 
 	/**
 	 * Creates a new {@link SimpleEntityPathResolver} with the given query package suffix.
-	 * 
+	 *
 	 * @param querySuffix must not be {@literal null}.
 	 */
 	public SimpleEntityPathResolver(String querySuffix) {
@@ -71,12 +74,27 @@ public class SimpleEntityPathResolver implements EntityPathResolver {
 			Class<?> pathClass = ClassUtils.forName(pathClassName, domainClass.getClassLoader());
 
 			return getStaticFieldOfType(pathClass)//
-					.map(it -> (EntityPath<T>) ReflectionUtils.getField(it, null))//
-					.orElseThrow(() -> new IllegalStateException(String.format(NO_FIELD_FOUND_TEMPLATE, pathClass)));
+				.map(it -> (EntityPath<T>) ReflectionUtils.getField(it, null))//
+				.orElseThrow(() -> new IllegalStateException(String.format(NO_FIELD_FOUND_TEMPLATE, pathClass)));
 
 		} catch (ClassNotFoundException e) {
 			throw new IllegalArgumentException(String.format(NO_CLASS_FOUND_TEMPLATE, pathClassName, domainClass.getName()),
-					e);
+				e);
+		}
+	}
+
+	public <T> Path<T> createSubPath(Class<T> domainClass, String path) {
+
+		String pathClassName = getQueryClassName(domainClass);
+
+		try {
+
+			Class<?> pathClass = ClassUtils.forName(pathClassName, domainClass.getClassLoader());
+			Constructor<?> constructor = ReflectionUtils.accessibleConstructor(pathClass, String.class);
+			return (Path<T>) constructor.newInstance(path);
+		} catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
+			throw new IllegalArgumentException(String.format(NO_CLASS_FOUND_TEMPLATE, pathClassName, domainClass.getName()),
+				e);
 		}
 	}
 
